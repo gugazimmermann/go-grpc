@@ -2,9 +2,11 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"go-grpc/greetpb/greetpb"
 	"log"
 	"net"
+	"time"
 
 	"google.golang.org/grpc"
 )
@@ -19,6 +21,21 @@ func (*server) Greet(ctx context.Context, req *greetpb.GreetRequest) (*greetpb.G
 		Result: result,
 	}
 	return res, nil
+}
+
+func (*server) GreetManyTimes(req *greetpb.GreetManyTimesRequest, stream greetpb.GreetService_GreetManyTimesServer) error {
+	log.Printf("GreetManyTimes was invoked  with %v\n", req)
+	firstName := req.GetGreeting().GetFirstName()
+	lastName := req.GetGreeting().GetLastName()
+	for i := 0; i < 10; i++ {
+		result := fmt.Sprintf("%d) Hello %s %s", (i + 1), firstName, lastName)
+		res := &greetpb.GreetManyTimesResponse{
+			Result: result,
+		}
+		stream.Send(res)
+		time.Sleep(1 * time.Second)
+	}
+	return nil
 }
 
 func main() {
