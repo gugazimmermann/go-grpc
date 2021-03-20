@@ -26,7 +26,9 @@ func main() {
 
 	// doServerStreaming(c)
 
-	doClientStreaming(c)
+	// doClientStreaming(c)
+
+	doBiDirectionalStreaming(c)
 }
 
 func doUnary(c greetpb.GreetServiceClient) {
@@ -107,7 +109,7 @@ func doClientStreaming(c greetpb.GreetServiceClient) {
 	}
 
 	for _, req := range requests {
-		log.Printf("Seding req: %v", req)
+		log.Printf("Sending req: %v", req)
 		stream.Send(req)
 		time.Sleep(1 * time.Second)
 	}
@@ -118,4 +120,74 @@ func doClientStreaming(c greetpb.GreetServiceClient) {
 	}
 
 	log.Printf("LongGreet response: %v", res)
+}
+
+func doBiDirectionalStreaming(c greetpb.GreetServiceClient) {
+	log.Println("Starting Bi Directional Streaming RPC...")
+
+	stream, err := c.GreetEveryone(context.Background())
+	if err != nil {
+		log.Printf("Error while calling GreetEveryone: %v", err)
+	}
+
+	requests := []*greetpb.GreetEveryoneRequest{
+		{
+			Greeting: &greetpb.Greeting{
+				FirstName: "Guga",
+				LastName:  "Zimmermann",
+			},
+		},
+		{
+			Greeting: &greetpb.Greeting{
+				FirstName: "José",
+				LastName:  "Augusto",
+			},
+		},
+		{
+			Greeting: &greetpb.Greeting{
+				FirstName: "Renata",
+				LastName:  "Negreiros",
+			},
+		},
+		{
+			Greeting: &greetpb.Greeting{
+				FirstName: "Felipe",
+				LastName:  "Kauling",
+			},
+		},
+	}
+
+	// Concurrency
+
+	waitChannel := make(chan struct{})
+
+	// send the messages using GO Routine
+	go func() {
+		for _, req := range requests {
+			log.Printf("Sending req: %v", req)
+			stream.Send(req)
+			time.Sleep(1 * time.Second)
+		}
+		stream.CloseSend()
+	}()
+
+	// receive messages using GO Routine
+	go func() {
+		for {
+			res, err := stream.Recv()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				log.Printf("Error while receiving response from GreetEveryone: %v", err)
+				break
+			}
+			result := res.GetResult()
+			log.Printf("LongGreet response: %v\n", result)
+		}
+		close(waitChannel)
+	}()
+
+	// block until everything is done
+	<-waitChannel
 }
